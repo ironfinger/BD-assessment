@@ -1,0 +1,130 @@
+#%%
+
+# Import libraries:
+import findspark
+import pyspark
+from pyspark.sql import SparkSession
+
+findspark.init()
+
+spark = SparkSession.builder.getOrCreate()
+
+# Load the data into a pyspark data frame:
+df = spark.read.csv("nuclear_plants_small_dataset.csv", inferSchema=True, header=True)
+df.show() # Show the data.
+df.count()
+#%%
+"""
+Check for missing values:
+"""
+from pyspark.sql.functions import col, isnan, when, count
+# This function checks to see if there are any Null or Nan values:
+def find_isNull_columns(data):
+    data.select([
+        count(when(
+            isnan(c) | 
+            col(c).isNull(), 
+            c)).alias(c) 
+        for c in data.columns]).show()
+
+# This function checks to see if there are any missing values in the form of a string:
+def find_empty_string_literal_values(data):
+    temp = df.select([
+        count(when(
+            col(c).contains('None') | \
+            col(c).contains('NULL') | \
+            (col(c) == '' ) | \
+            col(c).isNull() | \
+            isnan(c), c 
+            )).alias(c)
+            for c in df.columns])
+    
+    return temp
+
+# Call these functions to display the count of these missing values in each column:
+print('--- Check to See if there are any missing values ---')
+print('Null Columns')
+find_isNull_columns(df)
+
+print('Empty String literal values')
+df2 = find_empty_string_literal_values(df)
+df2.show()
+
+# %%
+
+"""
+Task 2:
+
+To Do:
+- Need to do median
+- Need to do mode
+"""
+
+Normal = df.where(df.Status == "Normal") # Get a dataset of just normal
+Abnormal = df.where(df.Status == "Abnormal") # Get a dataset of just abnormal
+
+# Drop the status column:
+Normal = Normal.drop("Status")
+Abnormal = Abnormal.drop("Status")
+
+# Calculate the mean of the features in the normal dataset:
+from pyspark.sql.functions import mean as _mean, stddev as _stddev, col
+from pyspark.sql.functions import variance as _var
+from pyspark.sql.functions import *
+
+
+"""Normal Statistics minimum, maximum, mean, median, mode, and variance values"""
+Mean_Normal = Normal.select(*[_mean(c).alias(c) for c in Normal.columns])
+Min_Normal = Normal.select(*[min(col(c)).alias(c) for c in Normal.columns])
+Max_Normal = Normal.select(*[max(col(c)).alias(c) for c in Normal.columns])
+Variance_Normal = Normal.select(*[_var(col(c)).alias(c) for c in Normal.columns])
+
+"""Abnormal Statistics Minimum, maximmum, mean, median, mode and variance values"""
+Mean_Abnormal = Abnormal.select(*[_mean(c).alias(c) for c in Abnormal.columns])
+Min_Abnormal = Abnormal.select(*[min(col(c)).alias(c) for c in Abnormal.columns])
+Max_Abnormal = Abnormal.select(*[max(col(c)).alias(c) for c in Abnormal.columns])
+Variance_Abnormal = Abnormal.select(*[_var(col(c)).alias(c) for c in Abnormal.columns])
+
+print('---Normal---')
+print('--Mean--')
+Mean_Normal.show()
+print('--Min--')
+Min_Normal.show()
+print('--Max--')
+Max_Normal.show()
+print('--Variance--')
+Variance_Normal.show()
+
+print('---Abnormal---')
+Mean_Abnormal.show()
+Min_Abnormal.show()
+Max_Abnormal.show()
+Variance_Normal.show()
+
+
+# %%
+
+"""Display boxplots for each feature"""
+import matplotlib.pyplot as plt
+
+df_pd = df.toPandas()
+df_pd.boxplot(by="Status")
+plt.show()
+
+
+# %%
+
+# Correlation matrix:
+from pyspark.ml.stat import Correlation
+from pyspark.ml.feature import VectorAssembler
+
+temp_df = df.drop(df.Status)
+
+vector_col = "corr_features"
+assembler = VectorAssembler(inputCols=temp_df.columns, outputCol=vector_col)
+df_vector = assembler.transform(temp_df).select(vector_col)
+
+# Get correlation matrix:
+matrix = Correlation.corr(df_vector, vector_col)
+matrix.show()
+# %%
