@@ -92,17 +92,29 @@ def show_mean(data):
     N_Max = Normal.select([max(c).alias(c) for c in Normal.columns])
     N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])
 
+    # Mode:
+    columns = Normal.columns
+
+    d = []
+    for c in columns:
+        
+        temp = Normal.groupBy(c).count()
+        b = temp.count
+        print(b) 
+    
+
+
     # Abnormal:
     A_Mean = Abnormal.select([_mean(c).alias(c) for c in Normal.columns])
     A_Min = Abnormal.select([min(c).alias(c) for c in Normal.columns])
     A_Max = Abnormal.select([max(c).alias(c) for c in Normal.columns])
     A_Var = Abnormal.select([_var(c).alias(c) for c in Normal.columns])
 
-    print('Normal Mean')
-    N_Var.show()
+
+
+    print('Normal Median')
 
     print('Abnormal Mean')
-    A_Mean.show()
    
     
 
@@ -138,7 +150,7 @@ def main():
     print('SUMMARY')
     show_mean(data=df)
     #display_boxplots(data=df)
-    print(corr_matrix(data=df))
+    
     print('DONE')
 
 
