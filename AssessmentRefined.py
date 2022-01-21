@@ -53,6 +53,15 @@ def show_mean(data):
 
     # Normal:
     N_Mean = Normal.select([_mean(c).alias(c) for c in Normal.columns])
+
+    print('mean')
+    N_Mean_pd = N_Mean.toPandas()
+
+    N_Mean_pd.insert(0, 'Type', ['Mean'])
+    N_Mean_pd.insert(0, 'Status', ['Normal'])
+
+    print(N_Mean_pd)
+
     N_Min = Normal.select([min(c).alias(c) for c in Normal.columns])
     N_Max = Normal.select([max(c).alias(c) for c in Normal.columns])
     N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])
@@ -72,6 +81,36 @@ def show_mean(data):
     A_mode = mode_dict(data=Abnormal)
     panda_bear_2 = pd.DataFrame(data=A_mode)
     print(panda_bear_2)
+
+    # Create the dataframe to display to the user:
+    
+    # Convert all to pandas df:
+    mean = N_Mean.toPandas() # Normal
+    minn = N_Min.toPandas()
+    maxn = N_Max.toPandas()
+    var = N_Var.toPandas()
+
+    A_Mean.toPandas() # Abnormal
+    A_Min.toPandas()
+    A_Max.toPandas()
+    A_Var.toPandas()
+
+    mean.insert(0, 'Type', ['Mean'])
+    mean.insert(0, 'Status', ['Normal'])
+    
+    minn.insert(0, 'Type', ['Min'])
+    minn.insert(0, 'Status', ['Normal'])
+
+    maxn.insert(0, 'Type', ['Max'])
+    maxn.insert(0, 'Status', ['Normal'])
+
+    var.insert(0, 'Type', ['Variance'])
+    var.insert(0, 'Status', ['Normal'])
+
+    mean.concat([N_Min, N_Max, N_Var])
+    print(N_Mean)
+    
+    
 
 """
 
