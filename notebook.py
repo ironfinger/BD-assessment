@@ -33,7 +33,46 @@ my_c = d_abnormal.groupBy("Power_range_sensor_2").count()
 """Puts the dataframe into descending order"""
 from pyspark.sql.functions import desc
 c = my_c.orderBy('count', ascending=False)
-c.show()
+# c.show()
+# df.collect()[0]['count(DISTINCT AP)']
+b = c.collect()[2]["Power_range_sensor_2"]
+print(b)
+
+#%%
+
+abnomral_dict = {}
+
+for c in d_abnormal.columns:
+    temp = d_abnormal.groupBy(c).count()
+    temp_2 = temp.orderBy('count', ascending=False)
+    temp_2.show()
+
+    print('mode: ', temp_2.collect()[0][c])
+    abnomral_dict[c] = temp_2.collect()[0][c]
+
+print(abnomral_dict)
+
+
+#%%
+
+Normal = df.where(df.Status == "Normal")
+Normal.show()
+d_normal = Normal.drop("Status")
+
+normal_dict = {}
+
+for c in d_normal.columns:
+    temp = d_normal.groupBy(c).count().first[0]
+    temp_2 = temp.orderBy('count', ascending=False)
+    temp_2.show()
+
+    print('mode: ', temp_2.collect()[0][c])
+    normal_dict[c] = temp_2.collect()[0][c]
+    
+
+"""FINISH THIS !!!!!!!"""
+
+
 
 #%%
 
@@ -51,7 +90,7 @@ print(mode)
 import pyspark.sql.functions as f 
 
 # df_median = df.groupBy('Status').agg(f.percentile_approx())
-df2 = df.groupBy('Status').agg(f.percentile_approx('Power_range_sensor_1', 0.5).alias('Power_range_sensor_1_median'))
+df2 = df.groupBy('Status').agg([f.percentile_approx(c, 0.5).alias('Power_range_sensor_1_median') for c in df.columns])
 df2.show()
 
 # %%
@@ -107,3 +146,10 @@ df_no_status = df.drop("Status")
 df_train, df_test = df_no_status.randomSplit(weights=[70, 30], seed=200)
 df_train.show()
 # %%
+
+
+# %%
+N_Mean = Normal.select([_mean(c).alias(c) for c in Normal.columns])
+N_Min = Normal.select([min(c).alias(c) for c in Normal.columns])
+N_Max = Normal.select([max(c).alias(c) for c in Normal.columns])
+N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])

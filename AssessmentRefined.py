@@ -6,12 +6,12 @@ from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 
 
 def get_sparkdf(spark, file_name):
     return spark.read.csv(file_name, inferSchema=True, header=True)
-
 
 
 def missing_values_check(data):
@@ -42,44 +42,9 @@ def missing_values_check(data):
 
 
 
-# def show_summary(data):
-    
-#     Normal = data.where(data.Status == "Normal")
-#     Abnormal = data.where(data.Status == "Abnormal")
-
-#     # Drop the status column:
-#     Normal = Normal.drop("Status")
-#     Abnormal = Abnormal.drop("Status")
-
-#     # Normal Statistics:
-#     Mean_Normal = Normal.select(*[_mean(c).alias(c) for c in Normal.columns])
-#     Min_Normal = Normal.select(*[min(col(c)).alias(c) for c in Normal.columns])
-#     Max_Normal = Normal.select(*[max(col(c)).alias(c) for c in Normal.columns])
-#     Variance_Normal = Normal.select(*[_var(col(c)).alias(c) for c in Normal.columns])
-
-#     # Abnormal Statistics:
-#     Mean_Abnormal = Abnormal.select(*[_mean(c).alias(c) for c in Abnormal.columns])
-#     Min_Abnormal = Abnormal.select(*[min(col(c)).alias(c) for c in Abnormal.columns])
-#     Max_Abnormal = Abnormal.select(*[max(col(c)).alias(c) for c in Abnormal.columns])
-#     Variance_Abnormal = Abnormal.select(*[_var(col(c)).alias(c) for c in Abnormal.columns])
-
-#     print('---Normal---')
-#     print('--Mean--')
-#     Mean_Normal.show()
-#     print('--Min--')
-#     Min_Normal.show()
-#     print('--Max--')
-#     Max_Normal.show()
-#     print('--Variance--')
-#     Variance_Normal.show()
-
-#     print('---Abnormal---')
-#     Mean_Abnormal.show()
-#     Min_Abnormal.show()
-#     Max_Abnormal.show()
-#     Variance_Normal.show()
-
 def show_mean(data):
+
+    # Get Normal and Abnormal datasets
     Normal = data.where(data.Status == "Normal")
     Normal = Normal.drop("Status")
 
@@ -93,16 +58,9 @@ def show_mean(data):
     N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])
 
     # Mode:
-    columns = Normal.columns
-
-    d = []
-    for c in columns:
-        
-        temp = Normal.groupBy(c).count()
-        b = temp.count
-        print(b) 
-    
-
+    N_mode = mode_dict(data=Normal)
+    panda_bear = pd.DataFrame(data=N_mode)
+    print(panda_bear)
 
     # Abnormal:
     A_Mean = Abnormal.select([_mean(c).alias(c) for c in Normal.columns])
@@ -110,12 +68,28 @@ def show_mean(data):
     A_Max = Abnormal.select([max(c).alias(c) for c in Normal.columns])
     A_Var = Abnormal.select([_var(c).alias(c) for c in Normal.columns])
 
+    # Mode
+    A_mode = mode_dict(data=Abnormal)
+    panda_bear_2 = pd.DataFrame(data=A_mode)
+    print(panda_bear_2)
 
+"""
 
-    print('Normal Median')
+d = {'col1': [1, 2], 'col2': [3, 4]}
+df = pd.DataFrame(data=d)
+"""
 
-    print('Abnormal Mean')
-   
+def mode_dict(data):
+    mode_dict = {}
+
+    for c in data.columns:
+        temp = data.groupBy(c).count()
+        temp_2 = temp.orderBy('count', ascending=False)
+        
+        mode_dict[c] = [temp_2.collect()[0][c]]
+
+    return mode_dict
+
     
 
 def display_boxplots(data):
@@ -124,17 +98,15 @@ def display_boxplots(data):
     plt.show()
 
 
-def corr_matrix(data):
+def correlation_matrix(df, corr_columns, method='pearson'):
+    vector_col = "corr_features"
+    assembler = VectorAssembler(inputCols=corr_columns, outputCol=vector_col)
+    df_vector = assembler.transform(df).select(vector_col)
+    matrix = Correlation.corr(df_vector, vector_col, method)
 
-    data_rdd = data.rdd.map(lambda row: row[0:])
-    corr_mat = Correlation.corr(data_rdd, method='pearson')
-    corr_mat_pd = pd.DataFrame(
-        corr_mat,
-        columns=data.columns,
-        index=data.columns
-    )
-
-    return corr_mat_pd
+    result = matrix.collect()[0]["pearson({})".format(vector_col)].values
+    return pd.DataFrame(result.reshape(-1, len(corr_columns)), columns=corr_columns, index=corr_columns)
+    
 
 
     
@@ -149,8 +121,19 @@ def main():
 
     print('SUMMARY')
     show_mean(data=df)
-    #display_boxplots(data=df)
     
+    Abnormal = df.where(df.Status == "Abnormal")
+    Normal = df.where(df.Status == "Normal")
+
+    Normal = Normal.drop("Status")
+    Abnormal = Abnormal.drop("Status")
+
+    corr_normal = correlation_matrix(df=Normal, corr_columns=Normal.columns)
+    print(corr_normal)
+
+    corr_abnormal = correlation_matrix(df=Abnormal, corr_columns=Abnormal.columns)
+    print(corr_abnormal)
+
     print('DONE')
 
 
