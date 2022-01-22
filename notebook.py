@@ -2,7 +2,7 @@
 import findspark
 import pyspark
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import mean as _mean, variance as _var, col, isnan, when, count, min, max
+from pyspark.sql.functions import mean as _mean, variance as _var, col, isnan, when, count, min, max, lit
 from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 import matplotlib.pyplot as plt
@@ -27,6 +27,9 @@ d_abnormal = Abnormal.drop("Status")
 # %%
 """This gets the row and count of each value in the dataset"""
 my_c = d_abnormal.groupBy("Power_range_sensor_2").count()
+from pyspark.sql.functions import lit
+my_2 = my_c.withColumn('Something', lit('mode'))
+my_2.show()
 
 # %%
 
@@ -52,6 +55,10 @@ for c in d_abnormal.columns:
 
 print(abnomral_dict)
 
+
+data = [abnomral_dict]
+df = spark.createDataFrame(data=data)
+df.show()
 
 #%%
 
@@ -152,4 +159,5 @@ df_train.show()
 N_Mean = Normal.select([_mean(c).alias(c) for c in Normal.columns])
 N_Min = Normal.select([min(c).alias(c) for c in Normal.columns])
 N_Max = Normal.select([max(c).alias(c) for c in Normal.columns])
-N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])
+
+# %%

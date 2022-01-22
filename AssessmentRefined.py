@@ -1,18 +1,16 @@
+from ctypes import Union
 import findspark
 import pyspark
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import mean as _mean, variance as _var, col, isnan, when, count, min, max
+from pyspark.sql.functions import mean as _mean, variance as _var, col, isnan, when, count, min, max, lit
 from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-
-
 def get_sparkdf(spark, file_name):
     return spark.read.csv(file_name, inferSchema=True, header=True)
-
 
 def missing_values_check(data):
     """
@@ -40,9 +38,7 @@ def missing_values_check(data):
     
     temp.show()
 
-
-
-def show_mean(data):
+def show_mean(data, spark):
 
     # Get Normal and Abnormal datasets
     Normal = data.where(data.Status == "Normal")
@@ -53,23 +49,25 @@ def show_mean(data):
 
     # Normal:
     N_Mean = Normal.select([_mean(c).alias(c) for c in Normal.columns])
-
-    print('mean')
-    N_Mean_pd = N_Mean.toPandas()
-
-    N_Mean_pd.insert(0, 'Type', ['Mean'])
-    N_Mean_pd.insert(0, 'Status', ['Normal'])
-
-    print(N_Mean_pd)
-
     N_Min = Normal.select([min(c).alias(c) for c in Normal.columns])
     N_Max = Normal.select([max(c).alias(c) for c in Normal.columns])
     N_Var = Normal.select([_var(c).alias(c) for c in Normal.columns])
 
-    # Mode:
-    N_mode = mode_dict(data=Normal)
-    panda_bear = pd.DataFrame(data=N_mode)
-    print(panda_bear)
+    mode_data = mode_dict(data=Normal)
+    df = pd.DataFrame(mode_data)
+    N_Mode = spark.createDataFrame(df)
+
+    N_Mean = N_Mean.withColumn('Summary', lit('Mean'))
+    N_Min = N_Min.withColumn('Summary', lit('Min'))
+    N_Max = N_Max.withColumn('Summary', lit('Max'))
+    N_Var = N_Var.withColumn('Summary', lit('Var'))
+    N_Mode = N_Mode.withColumn('Summary', lit('Mode'))
+
+    N_Mean = N_Mean.withColumn('Status', lit('Normal'))
+    N_Min = N_Min.withColumn('Status', lit('Normal'))
+    N_Max = N_Max.withColumn('Status', lit('Normal'))
+    N_Var = N_Var.withColumn('Status', lit('Normal'))
+    N_Mode = N_Mode.withColumn('Status', lit('Normal'))
 
     # Abnormal:
     A_Mean = Abnormal.select([_mean(c).alias(c) for c in Normal.columns])
@@ -77,40 +75,47 @@ def show_mean(data):
     A_Max = Abnormal.select([max(c).alias(c) for c in Normal.columns])
     A_Var = Abnormal.select([_var(c).alias(c) for c in Normal.columns])
 
-    # Mode
-    A_mode = mode_dict(data=Abnormal)
-    panda_bear_2 = pd.DataFrame(data=A_mode)
-    print(panda_bear_2)
+    mode_data = mode_dict(data=Abnormal)
+    df = pd.DataFrame(mode_data)
+    A_Mode = spark.createDataFrame(df)
 
-    # Create the dataframe to display to the user:
+    A_Mean = A_Mean.withColumn('Summary', lit('Mean'))
+    A_Min = A_Min.withColumn('Summary', lit('Min'))
+    A_Max = A_Max.withColumn('Summary', lit('Max'))
+    A_Var = A_Var.withColumn('Summary', lit('Var'))
+    A_Mode = A_Mode.withColumn('Summary', lit('Mode'))
+
+    A_Mean = A_Mean.withColumn('Status', lit('Abnormal'))
+    A_Min = A_Min.withColumn('Status', lit('Abnormal'))
+    A_Max = A_Max.withColumn('Status', lit('Abnormal'))
+    A_Var = A_Var.withColumn('Status', lit('Abnormal'))
+    A_Mode = A_Mode.withColumn('Status', lit('Abnormal'))
+
+    Union_df = N_Mean.union(N_Min)
+    Union_df = Union_df.union(N_Max)
+    Union_df = Union_df.union(N_Var)
+    Union_df = Union_df.union(N_Mode)
+    Union_df = Union_df.union(A_Mean)
+    Union_df = Union_df.union(A_Min)
+    Union_df = Union_df.union(A_Max)
+    Union_df = Union_df.union(A_Var)
+    Union_df = Union_df.union(A_Mode)
+    Union_df = put_cols_to_left(Union_df, ['Status', 'Summary'])
+    Union_df.show()
     
-    # Convert all to pandas df:
-    mean = N_Mean.toPandas() # Normal
-    minn = N_Min.toPandas()
-    maxn = N_Max.toPandas()
-    var = N_Var.toPandas()
 
-    A_Mean.toPandas() # Abnormal
-    A_Min.toPandas()
-    A_Max.toPandas()
-    A_Var.toPandas()
+def put_cols_to_left(data, cols_to_left):
+    original_cols = data.columns
+    ordered_cols = cols_to_left
 
-    mean.insert(0, 'Type', ['Mean'])
-    mean.insert(0, 'Status', ['Normal'])
-    
-    minn.insert(0, 'Type', ['Min'])
-    minn.insert(0, 'Status', ['Normal'])
+    for i, c in enumerate(original_cols):
+        if c != ordered_cols[i]:
+            ordered_cols.append(c)
 
-    maxn.insert(0, 'Type', ['Max'])
-    maxn.insert(0, 'Status', ['Normal'])
+    print(ordered_cols)
+    return data.select(ordered_cols[:-2])
 
-    var.insert(0, 'Type', ['Variance'])
-    var.insert(0, 'Status', ['Normal'])
 
-    mean.concat([N_Min, N_Max, N_Var])
-    print(N_Mean)
-    
-    
 
 """
 
@@ -155,11 +160,11 @@ def main():
     spark = SparkSession.builder.getOrCreate()
     df = get_sparkdf(spark=spark, file_name="nuclear_plants_small_dataset.csv")
     
-    print('MISSING VALUES')
-    missing_values_check(data=df)
+    # print('MISSING VALUES')
+    # missing_values_check(data=df)
 
     print('SUMMARY')
-    show_mean(data=df)
+    show_mean(data=df, spark=spark)
     
     Abnormal = df.where(df.Status == "Abnormal")
     Normal = df.where(df.Status == "Normal")
@@ -167,13 +172,14 @@ def main():
     Normal = Normal.drop("Status")
     Abnormal = Abnormal.drop("Status")
 
+    # THIS CODE MAXIMUS!!!!!
     corr_normal = correlation_matrix(df=Normal, corr_columns=Normal.columns)
     print(corr_normal)
 
-    corr_abnormal = correlation_matrix(df=Abnormal, corr_columns=Abnormal.columns)
-    print(corr_abnormal)
+    # corr_abnormal = correlation_matrix(df=Abnormal, corr_columns=Abnormal.columns)
+    # print(corr_abnormal)
 
-    print('DONE')
+    # print('DONE')
 
 
 
