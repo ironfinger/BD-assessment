@@ -1,4 +1,3 @@
-from ctypes import Union
 import findspark
 import pyspark
 from pyspark.sql import SparkSession
@@ -7,7 +6,12 @@ from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
+from pyspark.ml.feature import StringIndexer
+from pyspark.ml.classification import DecisionTreeClassifier
+from pyspark.ml.feature import StandardScaler
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.ml.classification import LinearSVC
+from pyspark.ml.classification import MultilayerPerceptronClassifier
 
 def get_sparkdf(spark, file_name):
     return spark.read.csv(file_name, inferSchema=True, header=True)
@@ -38,7 +42,7 @@ def missing_values_check(data):
     
     temp.show()
 
-def show_mean(data, spark):
+def show_summary(data, spark):
 
     # Get Normal and Abnormal datasets
     Normal = data.where(data.Status == "Normal")
@@ -103,7 +107,6 @@ def show_mean(data, spark):
     Union_df = put_cols_to_left(Union_df, ['Status', 'Summary'])
     Union_df.show()
     
-
 def put_cols_to_left(data, cols_to_left):
     original_cols = data.columns
     ordered_cols = cols_to_left
@@ -114,14 +117,6 @@ def put_cols_to_left(data, cols_to_left):
 
     print(ordered_cols)
     return data.select(ordered_cols[:-2])
-
-
-
-"""
-
-d = {'col1': [1, 2], 'col2': [3, 4]}
-df = pd.DataFrame(data=d)
-"""
 
 def mode_dict(data):
     mode_dict = {}
@@ -134,13 +129,10 @@ def mode_dict(data):
 
     return mode_dict
 
-    
-
 def display_boxplots(data):
     df_pd = data.toPandas() # Convert the spark df to pandas.
     df_pd.boxplot(by="Status")
     plt.show()
-
 
 def correlation_matrix(df, corr_columns, method='pearson'):
     vector_col = "corr_features"
@@ -151,9 +143,137 @@ def correlation_matrix(df, corr_columns, method='pearson'):
     result = matrix.collect()[0]["pearson({})".format(vector_col)].values
     return pd.DataFrame(result.reshape(-1, len(corr_columns)), columns=corr_columns, index=corr_columns)
     
+def index_label(df, colInput, colOutput='label'):
+    indexer = StringIndexer(inputCol=colInput, outputCol=colOutput)
+    return indexer.fit(df).transform(df)
 
-
+def get_features(df, features, colOutput='features'):
+    vector_assemble = VectorAssembler(inputCols=features, outputCol=colOutput)
+    return vector_assemble.transform(df)
     
+def get_train_test(df, seed, split=[0.7, 0.3]):
+    splits = df.randomSplit(split, seed)
+    train_df = splits[0]
+    test_df = splits[1]
+    return train_df, test_df
+
+def get_scaled_features(df, inputCol='features', outputCol='scaledFeatures'):
+    std_scaler = StandardScaler(inputCol='features', outputCol='scaledFeatures', withStd=True, withMean=False)
+    scaler_model = std_scaler.fit(df)
+    return scaler_model.transform(df)
+
+def generate_train_test(df):
+    # Get the features:
+    cols = df.columns
+    f = cols[:-1]
+    features = f[1:]
+    
+    # Get label:
+    df = index_label(df=df, colInput='Status')
+    
+    # Get features:
+    df = get_features(df=df, features=features)
+    
+    # Scale Features
+    df = get_scaled_features(df=df)
+    
+    train_df, test_df = get_train_test(df=df, seed=123)
+    
+    return train_df, test_df
+
+def desision_tree(df):
+
+    # Get train and test data:
+    train_df, test_df = generate_train_test(df=df)
+    
+    # Make Desicion Tree Obj:
+    dt = DecisionTreeClassifier(labelCol='label', featuresCol='scaledFeatures', impurity='gini')
+    
+    # Train the model:
+    dt_train = dt.fit(train_df)
+    
+    # Predict:
+    dt_pred = dt_train.transform(test_df)
+    
+    # Evaluation:
+    evaluator = MulticlassClassificationEvaluator(
+        labelCol='label', 
+        predictionCol='prediction', 
+        metricName='accuracy'
+    )
+    
+    mlpacc = evaluator.evaluate(dt_pred)
+    return dt_pred
+    
+def support_vector_machine(df):
+    
+    # Get the train and test data:
+    train_df, test_df = generate_train_test(df=df)
+    
+    # Make the support vector machine:
+    lsvc = LinearSVC(maxIter=10, regParam=0.1, featuresCol='scaledFeatures', labelCol='label')
+    
+    # Fit the model:
+    model = lsvc.fit(train_df)
+    
+    # Make the predictions:
+    pred_df = model.transform(test_df)
+    
+    # Evaluation:
+    evaluator = MulticlassClassificationEvaluator(
+        labelCol='label', 
+        predictionCol='prediction', 
+        metricName='accuracy'
+    )
+    
+    mlpacc = evaluator.evaluate(pred_df)
+    return pred_df
+
+def neural_net(df):
+    print('neural net')
+    
+    # df.show()
+    indexer = StringIndexer(inputCol="Status", outputCol="label")
+    ml_df = indexer.fit(df).transform(df)
+    
+    cols = ml_df.columns
+    f = cols[:-1]
+    features = f[1:]
+    
+    # Get features vector column:
+    vector_ass = VectorAssembler(inputCols=features, outputCol='features')
+    ml_df = vector_ass.transform(ml_df)
+    
+    # Split the data:
+    splits = ml_df.randomSplit([0.7, 0.3], 123)
+    train_df = splits[0]
+    test_df = splits[1]
+    
+    layers = [len(features), 15, 15, 2]
+    
+    mlp = MultilayerPerceptronClassifier(layers=layers, seed=1)
+    mlp_model = mlp.fit(train_df)
+    pred_df = mlp_model.transform(test_df)
+    evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
+    mlpacc = evaluator.evaluate(pred_df)
+    
+    return pred_df
+
+def error_rate(pred_df):
+  
+    normal = pred_df.where(pred_df.Status == "Normal")
+    abnormal = pred_df.where(pred_df.Status == "Abnormal")
+    
+    N_incorrect = normal.where(normal.prediction == 0)
+    A_incorrect = abnormal.where(abnormal.prediction == 1)
+    
+    n = N_incorrect.count()
+    a = A_incorrect.count()
+    p = pred_df.count()
+    
+    error = (n + a) / p
+    return error
+
 def main():
 
     findspark.init()
@@ -164,7 +284,7 @@ def main():
     # missing_values_check(data=df)
 
     print('SUMMARY')
-    show_mean(data=df, spark=spark)
+    show_summary(data=df, spark=spark)
     
     Abnormal = df.where(df.Status == "Abnormal")
     Normal = df.where(df.Status == "Normal")
@@ -174,14 +294,61 @@ def main():
 
     # THIS CODE MAXIMUS!!!!!
     corr_normal = correlation_matrix(df=Normal, corr_columns=Normal.columns)
+    print('correlation matrix normal')
     print(corr_normal)
 
-    # corr_abnormal = correlation_matrix(df=Abnormal, corr_columns=Abnormal.columns)
-    # print(corr_abnormal)
+    corr_abnormal = correlation_matrix(df=Abnormal, corr_columns=Abnormal.columns)
+    print('correlation matrix abnormal')
+    print(corr_abnormal)
+    
+    """Machine learning"""
+    print('Descision Tree Accuracy: ', desision_tree(df=df))
+    print('Support Vector Machine Accuracy: ', support_vector_machine(df=df))
+    
+    nn_pred = neural_net(df=df)
+    dt_pred = desision_tree(df=df)
+    svm_pred = support_vector_machine(df=df)
 
-    # print('DONE')
-
-
+    nn_error = error_rate(pred_df=nn_pred)
+    dt_error = error_rate(pred_df=dt_pred)
+    svm_error = error_rate(pred_df=svm_pred)
+    
+    print('Neural Net Error: ', nn_error)
+    print('Desicion Tree Error: ', dt_error)
+    print('Support Vector Error: ', svm_error)
+    # normal = pred.where(pred.Status == "Normal")
+    # abnormal = pred.where(pred.Status == "Abnormal")
+    
+    
+    # N_correct = normal.where(normal.prediction == 1)
+    # N_incorrect = normal.where(normal.prediction == 0)
+    
+    # A_correct = abnormal.where(abnormal.prediction == 0)
+    # A_incorrect = abnormal.where(abnormal.prediction == 1)
+    
+    # N_correct.show()
+    # N_incorrect.show()
+    
+    # A_correct.show()
+    # A_incorrect.show()
+    
+    
+    # print('-----------------------------------------')
+    # n = N_incorrect.count()
+    # print(n)
+    
+    # a = A_incorrect.count()
+    # print(a)
+    
+    # p = pred.count()
+    # print(p)
+    
+    # print('therefore')
+    # print((a + n) / p)
+    
+    
+    
+    
 
 if __name__ == "__main__":
     main()

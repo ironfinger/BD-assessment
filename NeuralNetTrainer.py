@@ -1,4 +1,3 @@
-from re import L
 import findspark
 import pyspark
 from pyspark.sql import SparkSession
@@ -21,7 +20,7 @@ def neural_net(train_df, layers_m, test_df, seed=1):
         mlp = MultilayerPerceptronClassifier(layers=layers, seed=1)
         mlp_model = mlp.fit(train_df)
         pred_df = mlp_model.transform(test_df)
-        evaluator = MulticlassClassificationEvaluator (labelCol='label', predictionCol='prediction', metricName='accuracy')
+        evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
         mlpaccc = evaluator.evaluate(pred_df)
         accuracies.append(mlpaccc)
         
@@ -56,27 +55,7 @@ def main():
     splits = ml_df.randomSplit([0.7, 0.3], 123)
     train_df = splits[0]
     test_df = splits[1]
-    
-    #12 !!!!
-    
-    layers_m = [
-        [len(features), 5, 5, 2],
-        [len(features), 6, 6, 2],
-        [len(features), 7, 5, 2],
-        [len(features), 8, 8, 2],
-        [len(features), 9, 9, 2],
-        [len(features), 10, 10, 2],
-        [len(features), 12, 12, 2],
-        [len(features), 13, 13, 2],
-        [len(features), 14, 14, 2],
-        [len(features), 15, 15, 2],
-        [len(features), 15, 6, 2],
-        [len(features), 13, 5, 2],
-        [len(features), 12, 4, 2],
-        [len(features), 13, 3, 2],
-        
-    ]
-    
+
     layers_m = [
         [len(features), 15, 15 , 2],     
     ]

@@ -139,3 +139,6 @@ dt_accuracy = evaluator.evaluate(pred_dt)
 print('accuracy: ', dt_accuracy)
 
 # %%
+pred_dt.show()
+
+# %%
