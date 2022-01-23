@@ -230,9 +230,7 @@ def support_vector_machine(df):
     return pred_df
 
 def neural_net(df):
-    print('neural net')
     
-    # df.show()
     indexer = StringIndexer(inputCol="Status", outputCol="label")
     ml_df = indexer.fit(df).transform(df)
     
@@ -316,38 +314,6 @@ def main():
     print('Neural Net Error: ', nn_error)
     print('Desicion Tree Error: ', dt_error)
     print('Support Vector Error: ', svm_error)
-    # normal = pred.where(pred.Status == "Normal")
-    # abnormal = pred.where(pred.Status == "Abnormal")
-    
-    
-    # N_correct = normal.where(normal.prediction == 1)
-    # N_incorrect = normal.where(normal.prediction == 0)
-    
-    # A_correct = abnormal.where(abnormal.prediction == 0)
-    # A_incorrect = abnormal.where(abnormal.prediction == 1)
-    
-    # N_correct.show()
-    # N_incorrect.show()
-    
-    # A_correct.show()
-    # A_incorrect.show()
-    
-    
-    # print('-----------------------------------------')
-    # n = N_incorrect.count()
-    # print(n)
-    
-    # a = A_incorrect.count()
-    # print(a)
-    
-    # p = pred.count()
-    # print(p)
-    
-    # print('therefore')
-    # print((a + n) / p)
-    
-    
-    
     
 
 if __name__ == "__main__":
