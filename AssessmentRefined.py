@@ -274,24 +274,24 @@ def error_rate(pred_df):
     error = (n + a) / p
     return error
 
-def get_confusion_m(pred_df):
-    # from pyspark.mllib.evaluation import MulticlassMetrics
-    # pred_labels = nn_pred.select(['label', 'prediction'])
-    # pred_labels.show()
+# def get_confusion_m(pred_df):
+#     # from pyspark.mllib.evaluation import MulticlassMetrics
+#     # pred_labels = nn_pred.select(['label', 'prediction'])
+#     # pred_labels.show()
     
-    # metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
-    # confusion = metrics.confusionMatrix().toArray()
-    # labels = [int(l) for l in metrics.call('labels')]
-    # confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
-    # print(confusion_m)
+#     # metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
+#     # confusion = metrics.confusionMatrix().toArray()
+#     # labels = [int(l) for l in metrics.call('labels')]
+#     # confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
+#     # print(confusion_m)
     
-    pred_labels = pred_df.select(['label', 'prediction'])
+#     pred_labels = pred_df.select(['label', 'prediction'])
     
-    metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
-    confusion = metrics.confusionMatrix().toArray()
-    labels = [int(l) for l in metrics.call('labels')]
-    confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
-    return confusion_m
+#     metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
+#     confusion = metrics.confusionMatrix().toArray()
+#     labels = [int(l) for l in metrics.call('labels')]
+#     confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
+#     return confusion_m
 
 def confusion_v2(pred_df):
     total_test_rows = pred_df.count()
@@ -324,28 +324,28 @@ def confusion_v2(pred_df):
     
     return confusion_m
     
-def get_specifity_sensitivity(pred_df):
-    confusion_m = get_confusion_m(pred_df=pred_df)
+# def get_specifity_sensitivity(pred_df):
+#     confusion_m = get_confusion_m(pred_df=pred_df)
     
-    print('Confusion Matrix: ')
-    print(confusion_m)
+#     print('Confusion Matrix: ')
+#     print(confusion_m)
     
-    confusion_m_np = confusion_m.to_numpy()
+#     confusion_m_np = confusion_m.to_numpy()
     
-    print('Confusion matrix')
-    print(confusion_m)
+#     print('Confusion matrix')
+#     print(confusion_m)
     
-    true_positive = confusion_m_np[0][0]
-    false_negative = confusion_m_np[1][0]
+#     true_positive = confusion_m_np[0][0]
+#     false_negative = confusion_m_np[1][0]
     
-    true_negative = confusion_m_np[1][1]
-    false_positive = confusion_m_np[0][1]
+#     true_negative = confusion_m_np[1][1]
+#     false_positive = confusion_m_np[0][1]
     
-    sensitivity = true_positive / (true_positive + false_negative)
-    specifity = true_negative / (true_negative + false_positive)
+#     sensitivity = true_positive / (true_positive + false_negative)
+#     specifity = true_negative / (true_negative + false_positive)
     
-    return sensitivity, specifity
-    
+#     return sensitivity, specifity
+
 def get_sens_speci(pred_df):
     confusion_m = confusion_v2(pred_df=pred_df)
     
@@ -400,6 +400,9 @@ def main():
     """Machine learning"""
     print('Descision Tree Accuracy: ', desision_tree(df=df))
     print('Support Vector Machine Accuracy: ', support_vector_machine(df=df))
+    
+    # Must get train and test data here:
+    # train_df, test_df = generate_train_test(df=df)
     
     nn_pred = neural_net(df=df)
     dt_pred = desision_tree(df=df)
