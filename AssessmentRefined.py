@@ -1,3 +1,4 @@
+from webbrowser import get
 import findspark
 import pyspark
 from pyspark.sql import SparkSession
@@ -12,6 +13,7 @@ from pyspark.ml.feature import StandardScaler
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.classification import LinearSVC
 from pyspark.ml.classification import MultilayerPerceptronClassifier
+from pyspark.mllib.evaluation import MulticlassMetrics
 
 def get_sparkdf(spark, file_name):
     return spark.read.csv(file_name, inferSchema=True, header=True)
@@ -272,8 +274,47 @@ def error_rate(pred_df):
     error = (n + a) / p
     return error
 
+def get_confusion_m(pred_df):
+    # from pyspark.mllib.evaluation import MulticlassMetrics
+    # pred_labels = nn_pred.select(['label', 'prediction'])
+    # pred_labels.show()
+    
+    # metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
+    # confusion = metrics.confusionMatrix().toArray()
+    # labels = [int(l) for l in metrics.call('labels')]
+    # confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
+    # print(confusion_m)
+    
+    
+    pred_labels = pred_df.select(['label', 'prediction'])
+    
+    metrics = MulticlassMetrics(pred_labels.rdd.map(lambda x: tuple(map(float, x))))
+    confusion = metrics.confusionMatrix().toArray()
+    labels = [int(l) for l in metrics.call('labels')]
+    confusion_m = pd.DataFrame(confusion, index=labels, columns=labels)
+    return confusion_m
+    
+def get_specifity_sensitivity(pred_df):
+    confusion_m = get_confusion_m(pred_df=pred_df)
+    confusion_m_np = confusion_m.to_numpy()
+    
+    true_positive = confusion_m_np[0][0]
+    false_negative = confusion_m_np[1][0]
+    
+    true_negative = confusion_m_np[1][1]
+    false_positive = confusion_m_np[0][1]
+    
+    sensitivity = true_positive / (true_positive + false_negative)
+    specifity = true_negative / (true_negative + false_positive)
+    
+    return sensitivity, specifity
+    
+
 def main():
 
+    # Abnormal = 0
+    # Normal = 1
+    
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
     df = get_sparkdf(spark=spark, file_name="nuclear_plants_small_dataset.csv")
@@ -315,6 +356,50 @@ def main():
     print('Desicion Tree Error: ', dt_error)
     print('Support Vector Error: ', svm_error)
     
+    nn_sens, nn_speci = get_specifity_sensitivity(pred_df=nn_pred)
+    dt_sens, dt_speci = get_specifity_sensitivity(pred_df=dt_pred)
+    svm_sens, svm_speci = get_specifity_sensitivity(pred_df=svm_pred)
+    
+    print('--- NEURAL NETWORK ---')
+    print('Sensitivity: ', nn_sens, ' Specitivity: ', nn_speci)
+    print('--- Descision Tree ---')
+    print('Sensitivity: ', dt_sens, ' Specitivity: ', dt_speci)
+    print('--- Support Vector Machine ---')
+    print('Sensitivity: ', svm_sens, ' Specitivity: ', svm_speci)
+    
+    # Obtain the confusion matrix's for the following models/predictions:
+    # nn_confusion = get_confusion_m(nn_pred)
+    # dt_confusion = get_confusion_m(dt_pred)
+    # svm_confusion = get_confusion_m(svm_pred)
+    
+    # print('Neural net confusion')
+    # print(nn_confusion)
+    
+    # print('')
+    # print('Neural Net confusion as np array')
+    # print(nn_confusion.to_numpy())
+    # nn_np_confusion = nn_confusion.to_numpy()
+    # Sensitivity = true positive / (true positive + false negative)
+    # Specifity = true negatives / (true negative + false positive)
+    
+    # Sensitivity = 113 / (133 + 36)
+    
+    # True positive = [0][0]
+    # false negative = [1][0]
+    
+    # True negative: [1][1]
+    # False positive: [0][1]
+    
+    # true_positive = nn_np_confusion[0][0]
+    # false_negative = nn_np_confusion[1][0]
+    
+    # true_negative = nn_np_confusion[1][1]
+    # false_positive = nn_np_confusion[0][1]
+    
+    # sensitivity = true_positive / (true_positive + false_negative)
+    # specifity = true_negative / (true_negative + false_positive)
+    
+    # print('sensitivity: ', sensitivity, ' | specifity: ', specifity)
 
 if __name__ == "__main__":
     main()
