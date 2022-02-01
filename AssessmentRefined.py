@@ -15,13 +15,15 @@ from pyspark.ml.classification import MultilayerPerceptronClassifier
 from pyspark.mllib.evaluation import MulticlassMetrics
 import numpy as np
 
+"""
+TODO: MUST ADD THE PIPELINE INTO THE ML
+TODO: MUST MAKE IT SO ALL MODELS USE THE SAME TEST AND TRAIN SET
+"""
+
 def get_sparkdf(spark, file_name):
     return spark.read.csv(file_name, inferSchema=True, header=True)
 
 def missing_values_check(data):
-    """
-    Task 01
-    """
 
     # Find IsNull:
     data.select([
@@ -131,6 +133,7 @@ def mode_dict(data):
 
     return mode_dict
 
+
 def display_boxplots(data):
     df_pd = data.toPandas() # Convert the spark df to pandas.
     df_pd.boxplot(by="Status")
@@ -167,8 +170,7 @@ def get_scaled_features(df, inputCol='features', outputCol='scaledFeatures'):
 def generate_train_test(df):
     # Get the features:
     cols = df.columns
-    f = cols[:-1]
-    features = f[1:]
+    features = cols[1:]
     
     # Get label:
     df = index_label(df=df, colInput='Status')
@@ -439,6 +441,7 @@ def main():
     print('Sensitivity: ', svm_sens, ' Specitivity: ', svm_speci)
     
 
-
 if __name__ == "__main__":
     main()
+    
+    
