@@ -67,3 +67,41 @@ mean_pd.rename(columns = {
 print(max)
 
 # %%
+# Format into a dictionary:
+print(df.columns)
+# %%
+pdCols = {}
+pdCols['Summary'] = ['Max']
+for i, x in enumerate(max):
+    pdCols[df.columns[i]] = [x]
+    
+print(pdCols)
+# %%
+import pandas as pd
+eh = pd.DataFrame(data=pdCols)
+# %%
+eh
+# %%
+mean_pd.head()
+
+# %%
+import numpy as np
+m = mean_pd.to_numpy()
+
+print(m[0])
+
+mean_arr = m[0]
+mean_dc = {}
+mean_dc['Summary'] = ['Mean']
+mean_dc['Status'] = ['Normal']
+
+cols = df.columns[1:]
+
+for i, x in enumerate(mean_arr):
+    mean_dc[cols[i]] = [x]
+print(mean_dc)
+
+# %%
+ehh = pd.DataFrame(data=mean_dc)
+ehh
+# %%

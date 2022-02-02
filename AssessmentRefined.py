@@ -183,12 +183,12 @@ def generate_train_test(df):
     
     train_df, test_df = get_train_test(df=df, seed=123)
     
-    return train_df, test_df
+    return train_df, test_df, features
 
 def desision_tree(df):
 
     # Get train and test data:
-    train_df, test_df = generate_train_test(df=df)
+    train_df, test_df, features = generate_train_test(df=df)
     
     # Make Desicion Tree Obj:
     dt = DecisionTreeClassifier(labelCol='label', featuresCol='scaledFeatures', impurity='gini')
@@ -212,7 +212,7 @@ def desision_tree(df):
 def support_vector_machine(df):
     
     # Get the train and test data:
-    train_df, test_df = generate_train_test(df=df)
+    train_df, test_df, features = generate_train_test(df=df)
     
     # Make the support vector machine:
     lsvc = LinearSVC(maxIter=10, regParam=0.1, featuresCol='scaledFeatures', labelCol='label')
@@ -235,25 +235,11 @@ def support_vector_machine(df):
 
 def neural_net(df):
     
-    indexer = StringIndexer(inputCol="Status", outputCol="label")
-    ml_df = indexer.fit(df).transform(df)
-    
-    cols = ml_df.columns
-    f = cols[:-1]
-    features = f[1:]
-    
-    # Get features vector column:
-    vector_ass = VectorAssembler(inputCols=features, outputCol='features')
-    ml_df = vector_ass.transform(ml_df)
-    
-    # Split the data:
-    splits = ml_df.randomSplit([0.7, 0.3], 123)
-    train_df = splits[0]
-    test_df = splits[1]
+    train_df, test_df, features = generate_train_test(df=df)
     
     layers = [len(features), 15, 15, 2]
     
-    mlp = MultilayerPerceptronClassifier(layers=layers, seed=1)
+    mlp = MultilayerPerceptronClassifier(layers=layers, featuresCol='scaledFeatures', labelCol='label')
     mlp_model = mlp.fit(train_df)
     pred_df = mlp_model.transform(test_df)
     evaluator = MulticlassClassificationEvaluator(labelCol='label', predictionCol='prediction', metricName='accuracy')
@@ -368,6 +354,80 @@ def get_sens_speci(pred_df):
     
     return sensitivity, specificity
     
+def big_dataset_summary(df):
+    # Map an rdd for the min max calculation:
+    min_max_rdd = df.rdd.map(lambda c: [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], c[12]])
+    
+    # Map an rdd for the mean calculation:
+    mean_rdd = df.rdd.map(lambda c: [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], c[12], 1])
+    mean_rdd = mean_rdd.map(lambda c: (c[0], list(c[1:])))
+    
+    # Max, min:
+    max = min_max_rdd.reduce(lambda x, y: x if x > y else y)
+    min = min_max_rdd.reduce(lambda x, y: x if x < y else y)
+    
+    # Calculate mean through reduce by key:
+    mean = mean_rdd.reduceByKey(lambda x, y: (
+        x[0] + y[0], 
+        x[1] + y[1], 
+        x[2] + y[2], 
+        x[3] + y[3], 
+        x[4] + y[4], 
+        x[5] + y[5], 
+        x[6] + y[6], 
+        x[7] + y[7], 
+        x[8] + y[8], 
+        x[9] + y[9], 
+        x[10] + y[10], 
+        x[11] + y[11] 
+    ))
+    
+    mean_data = mean.flatMap(lambda c: [(c[0], value) for value in c[1]]).toDF()
+    mean_data_t = mean_data.toPandas().T
+    mean_data_t = mean_data_t.drop(labels="_1")
+    
+    # Now time to try and visualise it all:
+    
+    # Get the max dictionarie:
+    pdCols = {}
+    pdCols['Summary'] = ['Max']
+    for i, x in enumerate(max):
+        pdCols[df.columns[i]] = [x]
+        
+    max_pd = pd.DataFrame(data=pdCols)
+    
+    # Get the min dictionary:
+    pdCols = {}
+    pdCols['Summary'] = ['Max']
+    for i, x in enumerate(min):
+        pdCols[df.columns[i]] = [x]
+        
+    min_pd = pd.DataFrame(data=pdCols)
+    
+    
+    # Get the mean dictionary:
+    pdCols = {}
+    pdCols['Summary'] = ['Mean']
+    pdCols['Status'] = ['Normal']
+    cols = df.columns[1:]
+    mean_arr = mean_data_t.to_numpy()
+    mean_arr = mean_arr[0]
+    
+    for i, x in enumerate(mean_arr):
+        pdCols[cols[i]] = [x]
+    mean_pd = pd.DataFrame(data=pdCols)
+    
+    map_reduce_results = pd.concat([mean_pd, min_pd, max_pd])
+    
+    """ DELETE THIS !!!!!"""
+    print('ARRAYS')
+    print(mean_arr)
+    print(min)
+    print(max)
+    
+    print('Mean min max using MapReduce')
+    print(map_reduce_results)   
+    
 
 def main():
 
@@ -377,6 +437,7 @@ def main():
     findspark.init()
     spark = SparkSession.builder.getOrCreate()
     df = get_sparkdf(spark=spark, file_name="nuclear_plants_small_dataset.csv")
+    big_df = get_sparkdf(spark=spark, file_name="nuclear_plants_big_dataset.csv")
     
     # print('MISSING VALUES')
     # missing_values_check(data=df)
@@ -439,6 +500,8 @@ def main():
     print('Sensitivity: ', dt_sens, ' Specitivity: ', dt_speci)
     print('--- Support Vector Machine ---')
     print('Sensitivity: ', svm_sens, ' Specitivity: ', svm_speci)
+    
+    big_dataset_summary(df=big_df)
     
 
 if __name__ == "__main__":
